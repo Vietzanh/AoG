@@ -14,7 +14,7 @@ import {Villager} from "../entities/Villager.ts";
 import {RtsCameraController} from "../camera/RtsCameraController.ts";
 import {ResourceNode, type ResourceType} from "../entities/ResourceNode.ts";
 import {TownCenter} from "../entities/TownCenter.ts";
-import type {ResourceCargo} from "../entities/Villager.ts";
+import { ResourceHUD } from "../ui/ResourceHUD.ts";
 
 export class Game {
     private app: AppBase;
@@ -43,6 +43,7 @@ export class Game {
         food: 0,
         gold: 0
     }
+    private resourceHUD: ResourceHUD;
     private wood: ResourceNode;
 
     private townCenter: TownCenter;
@@ -100,6 +101,10 @@ export class Game {
             type: "directional"
         });
         this.light.setLocalEulerAngles(-45,0,0);
+
+        // initialize resource HUD
+        this.resourceHUD = new ResourceHUD();
+        this.resourceHUD.renderResources(this.playerResources);
 
         // sync game's update funtion with app's update function
         this.app.on("update", (dt) => {
@@ -473,6 +478,9 @@ export class Game {
 
     // update function every frame
     private update(dt: number): void {
+        // variable used for detecting if need to change resource HUD
+        let resourcesChanged = false;
+
         for (const villager of this.villagers) {
             villager.update(dt);
 
@@ -484,6 +492,12 @@ export class Game {
             }
 
             this.playerResources[delivery.resourceType] += delivery.resourceAmount;
+
+            resourcesChanged = true;
+        }
+
+        if (resourcesChanged) {
+            this.resourceHUD.renderResources(this.playerResources);
         }
 
         this.cameraController.update(dt);

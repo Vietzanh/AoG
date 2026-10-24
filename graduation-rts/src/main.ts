@@ -20,6 +20,7 @@ import {
 } from 'playcanvas';
 
 import './style.css';
+import "./ui/resource-hud.css";
 import {Game} from "./game/Game.ts";
 import { RtsCameraController } from './camera/RtsCameraController.ts';
 
