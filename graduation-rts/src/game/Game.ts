@@ -12,7 +12,9 @@ import {
 } from "playcanvas";
 import {Villager} from "../entities/Villager.ts";
 import {RtsCameraController} from "../camera/RtsCameraController.ts";
-import {ResourceNode} from "../entities/ResourceNode.ts";
+import {ResourceNode, type ResourceType} from "../entities/ResourceNode.ts";
+import {TownCenter} from "../entities/TownCenter.ts";
+import type {ResourceCargo} from "../entities/Villager.ts";
 
 export class Game {
     private app: AppBase;
@@ -36,7 +38,14 @@ export class Game {
     private lastKeyPressTime: Map<number, number> = new Map();
     private readonly DOUBLE_TAP_INTERVAL = 300;
 
+    private playerResources: Record<ResourceType, number> = {
+        wood: 0,
+        food: 0,
+        gold: 0
+    }
     private wood: ResourceNode;
+
+    private townCenter: TownCenter;
 
     // units lineup formation
     private readonly UNIT_SPACING = 2.5;
@@ -57,6 +66,7 @@ export class Game {
         this.villagers.push(new Villager(new Vec3(0,0,15)));
         this.villagers.push(new Villager(new Vec3(0,0,20)));
         this.wood = new ResourceNode(new Vec3(15,2.5,15));
+        this.townCenter = new TownCenter(new Vec3(-5,0,10));
         
         this.app.root.addChild(this.ground);
         this.app.root.addChild(this.camera);
@@ -65,6 +75,7 @@ export class Game {
             this.app.root.addChild(villager);
         }
         this.app.root.addChild(this.wood);
+        this.app.root.addChild(this.townCenter);
 
         // initialize ground
         this.ground.addComponent("render", {
@@ -412,15 +423,21 @@ export class Game {
 
     // move selected villagers || gather resource
     private rightMouseClicked(hitEntity: Entity, hitPosition: Vec3): void {
-        // move selected villagers if right click on ground
+        // if right click on ground, villager move to town center
         if (hitEntity === this.ground) {
             // lineup selected villagers
             this.lineupUnits(hitPosition, this.selectedVillagers);
         }
-        // villagers move to and gather resource if right click on resource node
+        // if right click on resource node, villager move to and gather resource
         else if (hitEntity instanceof ResourceNode) {
             for (const villager of this.selectedVillagers) {
                 villager.moveToResourceNode(hitEntity);
+            }
+        }
+        // if right click on town center, villager move to town center
+        else if (hitEntity instanceof TownCenter) {
+            for (const villager of this.selectedVillagers) {
+                villager.moveToTownCenter(hitEntity);
             }
         }
     }
@@ -458,7 +475,17 @@ export class Game {
     private update(dt: number): void {
         for (const villager of this.villagers) {
             villager.update(dt);
+
+            // if villager carries resource to TC, add up to player's resources
+            const delivery = villager.consumeCompleteDelivery();
+
+            if (!delivery) {
+                continue;
+            }
+
+            this.playerResources[delivery.resourceType] += delivery.resourceAmount;
         }
+
         this.cameraController.update(dt);
 
         this.wood.update(dt);

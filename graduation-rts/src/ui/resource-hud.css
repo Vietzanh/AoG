@@ -1,0 +1,56 @@
+/* src/ui/resource-hud.css */
+
+.resource-hud {
+    /* set HUD according to browser's viewport */
+    position: fixed;
+
+    /* 12px from top */
+    top: 12px;
+    /* bring left of HUD to 50% width of viewport */
+    left: 50%;
+    /* move HUD to the left = 50% it's width to allign center */
+    transform: translateX(-50%);
+
+    /* arrange horizontally */
+    display: flex;
+    align-items: center;
+    /* gap between food, wood, gold */
+    gap: 24px;
+
+    padding: 10px 20px;
+
+    /* blur background to see game scene behind */
+    background: rgba(20, 24, 30, 0.85);
+    color: #f5f5f5;
+
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 10px;
+
+    font-family: Arial, sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+
+    /* keep HUD over canvas */
+    z-index: 1000;
+    /* prevent HUD from becoming target for mouse events, allowing clicks to pass through HUD and reach game  */
+    pointer-events: none;
+
+    white-space: nowrap;
+    user-select: none;
+}
+
+.resource-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.resource-icon {
+    font-size: 18px;
+}
+
+.resource-value {
+    min-width: 32px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}

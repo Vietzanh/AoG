@@ -11,7 +11,7 @@ export type ResourceType = "wood" | "food" | "gold";
 type InteractionSlot = {
     localOffset: Vec3,
     reservedBy: Villager | null
-}
+};
 
 export class ResourceNode extends Entity {
     private resourceType: ResourceType;
@@ -21,7 +21,7 @@ export class ResourceNode extends Entity {
     private interactionSlots: InteractionSlot[] = [];
 
     private readonly RESOURCE_CONFIG: Record<ResourceType, number> = {
-        "wood": 500,
+        "wood": 100,
         "food": 500,
         "gold": 2000
     };
@@ -45,7 +45,7 @@ export class ResourceNode extends Entity {
         const material = new StandardMaterial();
         material.diffuse = new Color(0.545, 0.271, 0.075);
         material.update();
-
+        
         this.render!.material = material;
         this.setLocalScale(2,5,2);
 
