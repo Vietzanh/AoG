@@ -26,10 +26,10 @@ export class ResourceNode extends Entity {
         "gold": 2000
     };
 
-    constructor (initialPosition: Vec3) {
+    constructor (initialPosition: Vec3, resourceType: ResourceType) {
         super("ResourceNode");
 
-        this.resourceType = "wood";
+        this.resourceType = resourceType;
         this.remainingAmount = this.RESOURCE_CONFIG[this.resourceType];
 
         this.setPosition(initialPosition);
@@ -136,6 +136,16 @@ export class ResourceNode extends Entity {
             this.remainingAmount = 0;
             return gatheredAmount;
         }
+    }
+
+    // get resource node footprint in X and Z
+    getFootprintHalfExtents(): {x: number, z: number} {
+        const scale = this.getLocalScale().clone();
+
+        return {
+            x: scale.x / 2,
+            z: scale.z / 2
+        };
     }
 
     // update per frame function

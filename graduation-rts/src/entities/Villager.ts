@@ -133,11 +133,6 @@ export class Villager extends Entity {
 
     // move to town center
     moveToTownCenter(townCenter: TownCenter): void {
-        // if villager does not carry anything, do nothing
-        if (this.cargo.carriedResourceType === null || this.cargo.carriedAmount <= 0) {
-            return;
-        }
-
         if (!townCenter) {
             return;
         }

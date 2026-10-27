@@ -8,13 +8,16 @@ import {
     Keyboard,
     KEY_CONTROL,
     RaycastResult,
-    KEY_1
+    KEY_1,
+    KEY_B
 } from "playcanvas";
 import {Villager} from "../entities/Villager.ts";
 import {RtsCameraController} from "../camera/RtsCameraController.ts";
 import {ResourceNode, type ResourceType} from "../entities/ResourceNode.ts";
 import {TownCenter} from "../entities/TownCenter.ts";
 import { ResourceHUD } from "../ui/ResourceHUD.ts";
+import type { Building } from "../entities/Building.ts";
+import { BuildingPlacementController } from "../build/BuildingPlacementController.ts";
 
 export class Game {
     private app: AppBase;
@@ -22,9 +25,11 @@ export class Game {
     private camera: Entity;
     private light: Entity;
     private mouse: Mouse;
+    private mousePosition = new Vec2();
     private cameraController: RtsCameraController;
     private canvas: HTMLCanvasElement;
     private keyboard: Keyboard;
+    private buildingPlacementController: BuildingPlacementController;
 
     private dragStart: Vec2 | null = null;
     private dragCurrent: Vec2 | null = null;
@@ -44,9 +49,9 @@ export class Game {
         gold: 0
     }
     private resourceHUD: ResourceHUD;
-    private wood: ResourceNode;
+    private resourceNodes: ResourceNode[] = [];
 
-    private townCenter: TownCenter;
+    private buildings: Building[] = [];
 
     // units lineup formation
     private readonly UNIT_SPACING = 2.5;
@@ -57,6 +62,7 @@ export class Game {
         this.camera = new Entity("camera");
         this.light = new Entity("light");
         this.cameraController = new RtsCameraController(this.camera, mouse, keyboard);
+        this.buildingPlacementController = new BuildingPlacementController();
         this.villagers.push(new Villager(new Vec3(0,0,0)));
         this.villagers.push(new Villager(new Vec3(5,0,0)));
         this.villagers.push(new Villager(new Vec3(10,0,0)));
@@ -66,8 +72,10 @@ export class Game {
         this.villagers.push(new Villager(new Vec3(0,0,10)));
         this.villagers.push(new Villager(new Vec3(0,0,15)));
         this.villagers.push(new Villager(new Vec3(0,0,20)));
-        this.wood = new ResourceNode(new Vec3(15,2.5,15));
-        this.townCenter = new TownCenter(new Vec3(-5,0,10));
+
+        this.resourceNodes.push(new ResourceNode(new Vec3(15,2.5,15), "wood"));
+
+        this.buildings.push(new TownCenter(new Vec3(-5,0,10)));
         
         this.app.root.addChild(this.ground);
         this.app.root.addChild(this.camera);
@@ -75,8 +83,12 @@ export class Game {
         for (const villager of this.villagers) {
             this.app.root.addChild(villager);
         }
-        this.app.root.addChild(this.wood);
-        this.app.root.addChild(this.townCenter);
+        for (const resourceNode of this.resourceNodes) {
+            this.app.root.addChild(resourceNode);
+        }
+        for (const building of this.buildings) {
+            this.app.root.addChild(building);
+        }
 
         // initialize ground
         this.ground.addComponent("render", {
@@ -117,6 +129,7 @@ export class Game {
             this.onMouseDown(event);
         }); 
         this.mouse.on("mousemove", (event) => {
+            this.mousePosition.set(event.x, event.y);
             this.onMouseMove(event);
         });
         this.mouse.on("mouseup", (event) => {
@@ -134,6 +147,18 @@ export class Game {
         this.keyboard.on("keydown", (event) => {
             // playcanvas.KeyboardEvent wraps browser's KeyboardEvent
             const originalEvent = event.event;
+
+            if (event.key === KEY_B) {
+                const building = this.buildingPlacementController.createPreview(new Vec3(5,5,5));
+                if (building) {
+                    const position = this.raycastMousePosition();
+                    if (position) {
+                        this.buildingPlacementController.updatePreviewPosition(position);
+                        this.buildingPlacementController.updatePreviewAppearane(this.resourceNodes, this.buildings);
+                        this.app.root.addChild(building);
+                    }
+                }
+            }
 
             // if key 1 is not tapped or key 1 is being hold instead of tapping, do nothing
             if (event.key !== KEY_1 || originalEvent?.repeat) {
@@ -372,7 +397,7 @@ export class Game {
         }
     }
 
-    // raycasting
+    // raycasting when a mouse event happens
     private raycast(event: MouseEvent): RaycastResult | null {
         const from = new Vec3();
         const to = new Vec3();
@@ -397,8 +422,38 @@ export class Game {
         if (!result) {
             return null;
         }
-
         return result;
+    }
+
+    // raycasting without need a mouse event happens, return position
+    private raycastMousePosition(): Vec3 | null {
+        const from = new Vec3();
+        const to = new Vec3();
+
+        this.camera.camera?.screenToWorld(
+            this.mousePosition.x,
+            this.mousePosition.y,
+            this.camera.camera.nearClip,
+            from
+        );
+
+        this.camera.camera?.screenToWorld(
+            this.mousePosition.x,
+            this.mousePosition.y,
+            this.camera.camera.farClip,
+            to
+        );
+
+        const rigidbody = this.app.systems.rigidbody;
+        const result = rigidbody?.raycastFirst(from, to);
+
+        if (!result) {
+            return null;
+        }
+        const position = result.point.clone();
+
+        position.y = 2.5;
+        return position;
     }
 
     // unselect all villagers
@@ -423,6 +478,15 @@ export class Game {
         // if entity is not Villager, unselect all villagers
         else {
             this.unselectVillagers();
+        }
+
+        // if a building pewview is existing, call placement function
+        if (this.buildingPlacementController.getPreview()) {
+            const building = this.buildingPlacementController.confirmPlacement(this.resourceNodes, this.buildings);
+
+            if (building) {
+                this.buildings.push(building);
+            }
         }
     }
 
@@ -502,6 +566,18 @@ export class Game {
 
         this.cameraController.update(dt);
 
-        this.wood.update(dt);
+        for (const resourceNode of this.resourceNodes) {
+            resourceNode.update(dt);
+        }
+
+        // update building preview and apperance based on raycast position
+        if (this.buildingPlacementController.getPreview()) {
+            const position = this.raycastMousePosition();
+            if (position) {
+                this.buildingPlacementController.updatePreviewPosition(position);
+            }
+            this.buildingPlacementController.updatePreviewAppearane(this.resourceNodes, this.buildings);
+        }
+
     }
 }
