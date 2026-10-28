@@ -8,6 +8,7 @@ import {Building} from "../entities/Building";
 import type {ResourceNode} from "../entities/ResourceNode";
 import {BuildingPreview} from "./BuildingPreview";
 import {TownCenter} from "../entities/TownCenter";
+import type { ResourceType } from "../entities/ResourceNode";
 
 // green
 const validColor = new Color(0,1,0);
@@ -22,8 +23,7 @@ export class BuildingPlacementController {
             return null;
         }
 
-        const building = new BuildingPreview(buildingScale);
-        console.log("TC preview created");
+        const building = new BuildingPreview(buildingScale, "TownCenter");
         return this.buildingPreview = building;
     }
 
@@ -33,10 +33,11 @@ export class BuildingPlacementController {
 
     removePreview(): void {
         this.buildingPreview?.destroy();
+        this.buildingPreview = null;
     }
 
     // check if can place building at the mouse position
-    canPlaceBuilding(buildingPreview: BuildingPreview, resourceNodes: ResourceNode[], existBuildings: Building[]) {
+    canPlaceBuilding(buildingPreview: BuildingPreview, resourceNodes: Set<ResourceNode>, existBuildings: Set<Building>) {
         const previewCenter = buildingPreview.getPosition().clone();
         const previewCenterX = previewCenter.x;
         const previewCenterZ = previewCenter.z;
@@ -77,7 +78,7 @@ export class BuildingPlacementController {
     }
 
     // update preview apperance
-    updatePreviewAppearane(resourceNodes: ResourceNode[], existBuildings: Building[]): void {
+    updatePreviewAppearane(resourceNodes: Set<ResourceNode>, existBuildings: Set<Building>): void {
         if (!this.buildingPreview?.render?.material) {
             return;
         }
@@ -94,16 +95,26 @@ export class BuildingPlacementController {
         this.buildingPreview.render.material = material;
     }
 
-    confirmPlacement(resourceNodes: ResourceNode[], existBuildings: Building[]): Building | null {
+    // check if space and resource available to create building
+    confirmPlacement(resourceNodes: Set<ResourceNode>, existBuildings: Set<Building>, availableResources: Record<ResourceType, number>): Building | null {
         if (!this.buildingPreview) {
             return null;
         }
 
+        // check for available space
         if (this.canPlaceBuilding(this.buildingPreview, resourceNodes, existBuildings)) {
             const placementPosition = this.buildingPreview.getPosition().clone();
-
             const building = new TownCenter(placementPosition)
-            return building;
+
+            // check for available resources
+            const cost = building.getCost();
+            if (cost && (availableResources.wood >= cost.wood && availableResources.food >= cost.food && availableResources.gold >= cost.gold)){
+                return building;
+            } else {
+                console.log("Not enough resources to place building");
+            }           
+        } else {
+            console.log("No space available to place building");
         }
 
         return null;

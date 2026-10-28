@@ -2,14 +2,20 @@ import {
     Entity,
     Vec3,
 } from "playcanvas";
+import type { ResourceType } from "./ResourceNode";
 
-type BuildingState = "underConstruction" | "completed";
+export type BuildingState = "underConstruction" | "completed";
+export type BuildingCost = Record<ResourceType,number>;
 
 export class Building extends Entity {
     // approach positions around building
     protected approachPositions: Vec3[] = [];
-
-    private state: BuildingState | null = null;
+    protected cost: BuildingCost | null = null;
+    protected buildAmount: number = 0;
+    protected readonly MAX_BUILD_AMOUNT: Record<string,number> = {
+        TownCenter: 100
+    };
+    protected state: BuildingState = "underConstruction";
 
     constructor(name: string) {
         super(name);
@@ -78,4 +84,33 @@ export class Building extends Entity {
             z: scale.z / 2
         };
     }
+
+    getState(): BuildingState {
+        return this.state;
+    }
+
+    setState(state: BuildingState): void {
+        this.state = state;
+    }
+
+    getCost(): BuildingCost {
+        return this.cost ? this.cost : {wood: 0, food: 0, gold: 0};
+    }
+
+    // check if building is under construction
+    isUnderConstruction(): boolean {
+        if (this.buildAmount < this.MAX_BUILD_AMOUNT[this.name]) {
+            return true;
+        }
+        return false;
+    }
+
+    // add build amount to building
+    build(buildAmount: number): void {
+        if (buildAmount > 0) {
+            this.buildAmount += buildAmount;
+        }
+    }
+
+
 }

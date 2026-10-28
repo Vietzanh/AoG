@@ -75,6 +75,10 @@ export class ResourceNode extends Entity {
         }
     }
 
+    getInteractionSlots(): InteractionSlot[] {
+        return this.interactionSlots;
+    }
+
     // check if there is still interaction slots, return 1; ì villager has already reserve 1, return it
     reserveInteractionSlot(villager: Villager): InteractionSlot | null {
         if (!this.canGather()) {
@@ -146,18 +150,5 @@ export class ResourceNode extends Entity {
             x: scale.x / 2,
             z: scale.z / 2
         };
-    }
-
-    // update per frame function
-    update(dt: number): void {
-        // if resource node is empty, destroy from screen
-        if (!this.canGather()) {
-            this.destroy();
-            for (const interactionSlot of this.interactionSlots) {
-                interactionSlot.reservedBy = null;
-            }
-        }
-
-
     }
 }

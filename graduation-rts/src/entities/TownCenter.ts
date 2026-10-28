@@ -12,7 +12,8 @@ export class TownCenter extends Building {
     constructor (initialPosition: Vec3) {
         super("TownCenter");
 
-        this.setPosition(initialPosition.clone().add(new Vec3(0,2.5,0)));
+        initialPosition.y = 2.5;
+        this.setPosition(initialPosition.clone());
 
         this.addComponent("render", {
             type: "box"
@@ -30,5 +31,12 @@ export class TownCenter extends Building {
         this.setLocalScale(5,5,5);
 
         this.createApproachPositions();
+
+        this.cost = {
+            wood: 50,
+            food: 0,
+            gold: 0
+        };
+        this.buildAmount = 100;
     }
 }

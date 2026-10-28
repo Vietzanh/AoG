@@ -5,8 +5,8 @@ import {
 
 export class BuildingPreview extends Entity {
 
-    constructor (buildingScale: Vec3) {
-        super("BuildingPreview");
+    constructor (buildingScale: Vec3, name: string) {
+        super(name);
 
         this.addComponent("render", {
             type: "box"

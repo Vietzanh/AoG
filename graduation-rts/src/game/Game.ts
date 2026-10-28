@@ -16,7 +16,7 @@ import {RtsCameraController} from "../camera/RtsCameraController.ts";
 import {ResourceNode, type ResourceType} from "../entities/ResourceNode.ts";
 import {TownCenter} from "../entities/TownCenter.ts";
 import { ResourceHUD } from "../ui/ResourceHUD.ts";
-import type { Building } from "../entities/Building.ts";
+import { Building } from "../entities/Building.ts";
 import { BuildingPlacementController } from "../build/BuildingPlacementController.ts";
 
 export class Game {
@@ -49,9 +49,9 @@ export class Game {
         gold: 0
     }
     private resourceHUD: ResourceHUD;
-    private resourceNodes: ResourceNode[] = [];
+    private resourceNodes: Set<ResourceNode> = new Set();
 
-    private buildings: Building[] = [];
+    private buildings: Set<Building> = new Set();
 
     // units lineup formation
     private readonly UNIT_SPACING = 2.5;
@@ -73,9 +73,9 @@ export class Game {
         this.villagers.push(new Villager(new Vec3(0,0,15)));
         this.villagers.push(new Villager(new Vec3(0,0,20)));
 
-        this.resourceNodes.push(new ResourceNode(new Vec3(15,2.5,15), "wood"));
+        this.resourceNodes.add(new ResourceNode(new Vec3(15,2.5,15), "wood"));
 
-        this.buildings.push(new TownCenter(new Vec3(-5,0,10)));
+        this.buildings.add(new TownCenter(new Vec3(-5,0,10)));
         
         this.app.root.addChild(this.ground);
         this.app.root.addChild(this.camera);
@@ -87,6 +87,7 @@ export class Game {
             this.app.root.addChild(resourceNode);
         }
         for (const building of this.buildings) {
+            building.setState("completed");
             this.app.root.addChild(building);
         }
 
@@ -148,7 +149,8 @@ export class Game {
             // playcanvas.KeyboardEvent wraps browser's KeyboardEvent
             const originalEvent = event.event;
 
-            if (event.key === KEY_B) {
+            // if player press B when at least 1 villager is being selected
+            if (event.key === KEY_B && this.selectedVillagers.size > 0) {
                 const building = this.buildingPlacementController.createPreview(new Vec3(5,5,5));
                 if (building) {
                     const position = this.raycastMousePosition();
@@ -464,7 +466,24 @@ export class Game {
         this.selectedVillagers.clear();
     }
 
-    // if left mouse clicked on a villager, select/unselect villager
+    // check for available space and resource to place building, then create building and decrease player resources
+    private placeBuilding(): Building | null {
+        const building = this.buildingPlacementController.confirmPlacement(this.resourceNodes, this.buildings, this.playerResources);
+        if (building) {
+            this.playerResources.wood -= building.getCost().wood;
+            this.playerResources.food -= building.getCost().food;
+            this.playerResources.gold -= building.getCost().gold;
+
+            this.buildings.add(building);
+            this.app.root.addChild(building);
+            this.buildingPlacementController.removePreview();
+
+            return building;
+        }
+        return null;
+    }
+
+    // handle events hen left mouse clicked
     private leftMouseClicked(entity: Entity): void {
         // if entity is Villager => unselect all villagers, then select the new villager
         if (entity instanceof Villager) {
@@ -474,24 +493,30 @@ export class Game {
             }
             entity.setSelected(true);
             this.selectedVillagers.add(entity);
-        }
-        // if entity is not Villager, unselect all villagers
-        else {
-            this.unselectVillagers();
-        }
-
-        // if a building pewview is existing, call placement function
-        if (this.buildingPlacementController.getPreview()) {
-            const building = this.buildingPlacementController.confirmPlacement(this.resourceNodes, this.buildings);
-
-            if (building) {
-                this.buildings.push(building);
+        } else {
+            // if a building preview is existing, try place building
+            if (this.buildingPlacementController.getPreview()) {
+                const plannedBuilding = this.placeBuilding();
+                for (const villager of this.selectedVillagers) {
+                    villager.moveToBuilding(plannedBuilding);
+                }
+                this.resourceHUD.renderResources(this.playerResources);
+            }
+            // if no building preview is existing, unselect all villagers
+            else {
+                this.unselectVillagers();
             }
         }
     }
 
-    // move selected villagers || gather resource
+    // handle events when right mouse clicked
     private rightMouseClicked(hitEntity: Entity, hitPosition: Vec3): void {
+        // if a building preview is existing, remove it
+        if (this.buildingPlacementController.getPreview()) {
+            this.buildingPlacementController.removePreview();
+            return;
+        }
+
         // if right click on ground, villager move to town center
         if (hitEntity === this.ground) {
             // lineup selected villagers
@@ -504,9 +529,9 @@ export class Game {
             }
         }
         // if right click on town center, villager move to town center
-        else if (hitEntity instanceof TownCenter) {
+        else if (hitEntity instanceof Building) {
             for (const villager of this.selectedVillagers) {
-                villager.moveToTownCenter(hitEntity);
+                villager.moveToBuilding(hitEntity);
             }
         }
     }
@@ -567,7 +592,13 @@ export class Game {
         this.cameraController.update(dt);
 
         for (const resourceNode of this.resourceNodes) {
-            resourceNode.update(dt);
+            if (!resourceNode.canGather()) {
+                this.resourceNodes.delete(resourceNode);
+                for (const interactionSlot of resourceNode.getInteractionSlots()) {
+                    interactionSlot.reservedBy = null;
+                }
+                resourceNode.destroy();
+            }
         }
 
         // update building preview and apperance based on raycast position

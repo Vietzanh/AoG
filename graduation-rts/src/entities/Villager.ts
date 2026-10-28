@@ -1,9 +1,10 @@
 import {Entity, Vec3} from "playcanvas";
 import type {ResourceNode, ResourceType} from "./ResourceNode";
-import type { TownCenter } from "./TownCenter";
+import { TownCenter } from "./TownCenter";
+import type { Building } from "./Building";
 
 
-type VillagerState = "idle" | "moving" | "gathering" | "building" | "movingToResource" | "movingToTownCenter";
+type VillagerState = "idle" | "moving" | "gathering" | "building" | "movingToResource" | "depositing" | "movingToPlannedBuidling";
 
 export type ResourceCargo = {
     carriedResourceType: ResourceType | null,
@@ -28,8 +29,12 @@ export class Villager extends Entity {
     private readonly GATHER_AMOUNT = 10;
     private readonly GATHER_INTERVAL = 1;
 
-    private targetTownCenter: TownCenter | null = null;
+    private targetBuilding: TownCenter | null = null;
     private deliveryCompleted = false;
+
+    private buildTimer = 0;
+    private readonly BUILD_INTERVAL = 1;
+    private readonly BUILD_SPEED = 10;
 
     constructor(initialPosition: Vec3 | null = null) {
         super("Villager");
@@ -87,7 +92,8 @@ export class Villager extends Entity {
         this.targetResource?.releaseInteractionSlot(this);
         this.targetResource = null;
         this.gatherTimer = 0;
-        this.targetTownCenter = null;
+        this.buildTimer = 0;
+        this.targetBuilding = null;
     }
 
     // set target position for villager to move to
@@ -98,7 +104,7 @@ export class Villager extends Entity {
         this.targetPosition = target.clone();
     }
 
-    // villager moves to near resource node
+    // set villager's target position to resource node
     moveToResourceNode(resourceNode: ResourceNode): void {
         if (!resourceNode) {
             return;
@@ -131,17 +137,29 @@ export class Villager extends Entity {
         this.gatherTimer = 0;
     }
 
-    // move to town center
-    moveToTownCenter(townCenter: TownCenter): void {
-        if (!townCenter) {
+    // set villager's target position to building, whether for depositing, building or just moving
+    moveToBuilding(building: Building | null): void {
+        if (!building) {
             return;
         }
 
         this.cancelCurrentTask();
-        this.targetTownCenter = townCenter;
+        this.targetBuilding = building;
 
-        this.state = "movingToTownCenter";
-        const targetPosition = townCenter.getApproachPosition(this.getPosition().clone());
+        // if building is under construction
+        if (building.getState() === "underConstruction") {
+            this.state = "movingToPlannedBuidling";
+        } 
+        // if building is not under construction, check for depositing or just moving
+        else {
+            if (building instanceof TownCenter) {
+                this.state = "depositing";
+            } else {
+                this.state = "moving";
+            }
+        }
+
+        const targetPosition = building.getApproachPosition(this.getPosition().clone());
         this.targetPosition = targetPosition;
     }
 
@@ -165,12 +183,13 @@ export class Villager extends Entity {
                 this.state = "idle";
             } else if (this.state === "movingToResource") {
                 this.state = "gathering";
-            } else if (this.state === "movingToTownCenter") {
+            } else if (this.state === "depositing") {
                 this.markDeliveryCompleted();
                 this.state = "idle";
+            } else if (this.state === "movingToPlannedBuidling") {
+                this.state = "building";
+
             }
-
-
             return;
         }
 
@@ -216,17 +235,35 @@ export class Villager extends Entity {
         return {resourceType: carriedResourceType, resourceAmount: carriedAmount};
     }
 
+    // add building amount to the planned building
+    build(building: Building) {
+        if (building.isUnderConstruction()) {
+            building.build(this.BUILD_SPEED);
+        } else {
+            this.state = "idle";
+            this.targetBuilding = null;
+        }
+        this.buildTimer = 0;
+    }
+
 
     // update function every frame
     update(dt: number): void {
         this.move(dt);
 
-        // start gather timer if state is gathering
+        // start gather timer if state is "gathering"
         if (this.state === "gathering") {
             this.gatherTimer += dt;
-
             if (this.gatherTimer >= this.GATHER_INTERVAL && this.targetResource !== null) {
                 this.gatherFrom(this.targetResource);
+            }
+        }
+
+        // start build timer and build if state is "building"
+        if (this.state === "building") {
+            this.buildTimer += dt;
+            if (this.buildTimer >= this.BUILD_INTERVAL && this.targetBuilding !== null) {
+                this.build(this.targetBuilding);
             }
         }
     }
