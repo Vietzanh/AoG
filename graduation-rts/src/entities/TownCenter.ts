@@ -2,7 +2,8 @@ import {
     Entity,
     StandardMaterial,
     Vec3,
-    Color
+    Color,
+    BLEND_NORMAL
 } from "playcanvas";
 import { Building } from "./Building";
 
@@ -22,14 +23,14 @@ export class TownCenter extends Building {
             type: "box",
             halfExtents: new Vec3(2.5,2.5,2.5)
         });
-        
-        const material = new StandardMaterial();
-        material.diffuse = new Color(0.72, 0.52, 0.20);
-        material.update();
 
-        this.render!.material = material;
         this.setLocalScale(5,5,5);
 
+        // initial apperance with low opcaity
+        this.buildingMaterial.diffuse = new Color(0.72, 0.52, 0.20);
+        this.buildingMaterial.update();
+        this.render!.material = this.buildingMaterial;
+        
         this.createApproachPositions();
 
         this.cost = {
@@ -37,6 +38,5 @@ export class TownCenter extends Building {
             food: 0,
             gold: 0
         };
-        this.buildAmount = 100;
     }
 }

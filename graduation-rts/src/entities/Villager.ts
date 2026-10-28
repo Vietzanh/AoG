@@ -239,8 +239,10 @@ export class Villager extends Entity {
     build(building: Building) {
         if (building.isUnderConstruction()) {
             building.build(this.BUILD_SPEED);
+            console.log(this.targetBuilding?.getState());
         } else {
             this.state = "idle";
+            building.setState("completed");
             this.targetBuilding = null;
         }
         this.buildTimer = 0;

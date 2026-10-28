@@ -44,7 +44,7 @@ export class Game {
     private readonly DOUBLE_TAP_INTERVAL = 300;
 
     private playerResources: Record<ResourceType, number> = {
-        wood: 0,
+        wood: 150,
         food: 0,
         gold: 0
     }
@@ -88,6 +88,7 @@ export class Game {
         }
         for (const building of this.buildings) {
             building.setState("completed");
+            building.updateApperance(building.getMaxBuildAmount());
             this.app.root.addChild(building);
         }
 

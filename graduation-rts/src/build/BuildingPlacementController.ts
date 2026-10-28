@@ -17,6 +17,7 @@ const invalidColor = new Color(1,0,0);
 
 export class BuildingPlacementController {
     private buildingPreview: BuildingPreview | null = null;
+    private previewMaterial = new StandardMaterial();
     
     createPreview(buildingScale: Vec3): BuildingPreview | null {
         if (this.buildingPreview) {
@@ -83,16 +84,14 @@ export class BuildingPlacementController {
             return;
         }
 
-        const material = new StandardMaterial();
-
         if (this.canPlaceBuilding(this.buildingPreview, resourceNodes, existBuildings)) {
-            material.diffuse = validColor;
+            this.previewMaterial.diffuse = validColor;
         } else {
-            material.diffuse = invalidColor;
+            this.previewMaterial.diffuse = invalidColor;
         }
 
-        material.update();
-        this.buildingPreview.render.material = material;
+        this.previewMaterial.update();
+        this.buildingPreview.render.material = this.previewMaterial;
     }
 
     // check if space and resource available to create building

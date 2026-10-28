@@ -1,6 +1,8 @@
 import {
     Entity,
+    StandardMaterial,
     Vec3,
+    BLEND_NORMAL
 } from "playcanvas";
 import type { ResourceType } from "./ResourceNode";
 
@@ -13,12 +15,22 @@ export class Building extends Entity {
     protected cost: BuildingCost | null = null;
     protected buildAmount: number = 0;
     protected readonly MAX_BUILD_AMOUNT: Record<string,number> = {
-        TownCenter: 100
+        "TownCenter": 100
     };
     protected state: BuildingState = "underConstruction";
 
+    protected buildingMaterial = new StandardMaterial();
+
     constructor(name: string) {
         super(name);
+
+        // initial apperance with low opacity
+        this.buildingMaterial.blendType = BLEND_NORMAL;
+        this.buildingMaterial.opacity = 10 / this.MAX_BUILD_AMOUNT[this.name];
+        this.buildingMaterial.update();
+        if (this.render) {
+            this.render.material = this.buildingMaterial;
+        }
     }
 
     // create approach positions around building
@@ -105,10 +117,25 @@ export class Building extends Entity {
         return false;
     }
 
-    // add build amount to building
+    // get max build amount of the building
+    getMaxBuildAmount(): number {
+        return this.MAX_BUILD_AMOUNT[this.name];
+    }
+
+    // add build amount to building, update apperance based on built amount
     build(buildAmount: number): void {
         if (buildAmount > 0) {
             this.buildAmount += buildAmount;
+        }
+        this.updateApperance(this.buildAmount);
+    }
+
+    // update building apperance while under construction
+    updateApperance(buildAmount: number): void {
+        this.buildingMaterial.opacity = buildAmount / this.MAX_BUILD_AMOUNT[this.name];
+        this.buildingMaterial.update();
+        if (this.render) {
+            this.render.material = this.buildingMaterial;
         }
     }
 
