@@ -8,6 +8,8 @@ import type {ResourceType} from "./ResourceNode";
 import type {UnitCost, UnitType} from "./Building";
 
 export class TownCenter extends Building {
+    private spawnPositions: Vec3[] = [];
+
     private currentProduction: ProductionOrder | null = null;
 
     private readonly productionCosts: Partial<Record<UnitType, UnitCost>> = {
@@ -35,13 +37,50 @@ export class TownCenter extends Building {
         this.buildingMaterial.update();
         this.render!.material = this.buildingMaterial;
         
-        this.createApproachPositions();
-
         this.cost = {
             wood: 50,
             food: 0,
             gold: 0
         };
+
+        // create spawn positions and approach positions
+        this.createSpawnPositions();
+        this.createApproachPositions();
+    }
+
+    // create villager spawn positions
+    private createSpawnPositions(): void {
+        const offsetFromCenter = (this.getLocalScale().clone().x / 2) * (Math.sqrt(2) + 0.3);
+        const offsets = [
+            new Vec3(offsetFromCenter,0,0),
+            new Vec3(-offsetFromCenter,0,0),
+            new Vec3(0,0,offsetFromCenter),
+            new Vec3(0,0,-offsetFromCenter)
+        ] 
+
+        const centerPosition = this.getPosition().clone();
+        centerPosition.y = 0;
+        for (const offset of offsets) {
+            const position = centerPosition.clone().add(offset);
+            this.spawnPositions.push(position);
+        }
+    }
+
+    // get nearest spawn position
+    getSpawnPosition(villagerPosition: Vec3): Vec3 {
+        let nearest = this.approachPositions[0];
+        let minDistance = Infinity;
+
+        for (const position of this.spawnPositions) {
+            const distance = position.clone().sub(villagerPosition).length();
+
+            if (distance < minDistance) {
+                minDistance = distance;
+                nearest = position;
+            }
+        }
+
+        return nearest;
     }
 
     // check condition to start production of a unit
