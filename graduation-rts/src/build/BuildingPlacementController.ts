@@ -9,11 +9,15 @@ import type {ResourceNode} from "../entities/ResourceNode";
 import {BuildingPreview} from "./BuildingPreview";
 import {TownCenter} from "../entities/TownCenter";
 import type { ResourceType } from "../entities/ResourceNode";
+import { BUILDING_COST } from "../entities/Building";
 
+// red
+const noSpaceColor = new Color(1,0,0);
+// yellow
+const noResourecColor = new Color(1,1,0);
 // green
 const validColor = new Color(0,1,0);
-// red
-const invalidColor = new Color(1,0,0);
+
 
 export class BuildingPlacementController {
     private buildingPreview: BuildingPreview | null = null;
@@ -37,12 +41,17 @@ export class BuildingPlacementController {
         this.buildingPreview = null;
     }
 
-    // check if can place building at the mouse position
-    canPlaceBuilding(buildingPreview: BuildingPreview, resourceNodes: Set<ResourceNode>, existBuildings: Set<Building>) {
+    // check for available space
+    isAvailableSpace(buildingPreview: BuildingPreview, resourceNodes: Set<ResourceNode>, existBuildings: Set<Building>) {
         const previewCenter = buildingPreview.getPosition().clone();
         const previewCenterX = previewCenter.x;
         const previewCenterZ = previewCenter.z;
         const previewHalf = buildingPreview.getFootprintHalfExtents();
+
+        // check if exceed map limits
+        if ((Math.abs(previewCenterX)+previewHalf.x >= 25) || (Math.abs(previewCenterZ)+previewHalf.z >= 25)) {
+            return false;
+        }
 
         // check if any existing buildings overlap with the planning building
         for (const existBuilding of existBuildings) {
@@ -73,21 +82,32 @@ export class BuildingPlacementController {
         return true;
     }
 
+    // check for available resources
+    isAvailableResources(availableResources: Record<ResourceType, number>): boolean {
+        const cost = BUILDING_COST["TownCenter"];
+        if (cost && (availableResources.wood>=cost.wood && availableResources.food>=cost.food && availableResources.gold>=cost.gold)) {
+            return true;
+        }
+        return false;
+    }
+
     // update preview position
     updatePreviewPosition(position: Vec3): void {
         this.buildingPreview?.setPosition(position);
     }
 
     // update preview apperance
-    updatePreviewAppearane(resourceNodes: Set<ResourceNode>, existBuildings: Set<Building>): void {
+    updatePreviewApperane(resourceNodes: Set<ResourceNode>, existBuildings: Set<Building>, availableResources: Record<ResourceType, number>): void {
         if (!this.buildingPreview?.render?.material) {
             return;
         }
 
-        if (this.canPlaceBuilding(this.buildingPreview, resourceNodes, existBuildings)) {
-            this.previewMaterial.diffuse = validColor;
+        if (!this.isAvailableSpace(this.buildingPreview, resourceNodes, existBuildings)) {
+            this.previewMaterial.diffuse = noSpaceColor;
+        } else if (!this.isAvailableResources(availableResources)) {
+            this.previewMaterial.diffuse = noResourecColor;
         } else {
-            this.previewMaterial.diffuse = invalidColor;
+            this.previewMaterial.diffuse = validColor;
         }
 
         this.previewMaterial.update();
@@ -101,21 +121,19 @@ export class BuildingPlacementController {
         }
 
         // check for available space
-        if (this.canPlaceBuilding(this.buildingPreview, resourceNodes, existBuildings)) {
+        if (this.isAvailableSpace(this.buildingPreview, resourceNodes, existBuildings)) {
             const placementPosition = this.buildingPreview.getPosition().clone();
             const building = new TownCenter(placementPosition)
 
             // check for available resources
-            const cost = building.getCost();
-            if (cost && (availableResources.wood >= cost.wood && availableResources.food >= cost.food && availableResources.gold >= cost.gold)){
+            if (this.isAvailableResources(availableResources)) {
                 return building;
             } else {
                 console.log("Not enough resources to place building");
-            }           
+            }        
         } else {
             console.log("No space available to place building");
         }
-
         return null;
     }
 

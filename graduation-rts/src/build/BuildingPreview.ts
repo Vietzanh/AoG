@@ -11,10 +11,6 @@ export class BuildingPreview extends Entity {
         this.addComponent("render", {
             type: "box"
         });
-        this.addComponent("collision", {
-            type: "box",
-            halfExtents: new Vec3(2.5,2.5,2.5)
-        });
 
         this.setLocalScale(buildingScale);
     }

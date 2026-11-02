@@ -8,6 +8,12 @@ import type { ResourceType } from "./ResourceNode";
 
 export type BuildingState = "underConstruction" | "completed";
 export type BuildingCost = Record<ResourceType,number>;
+export const BUILDING_COST: Record<string, Record<ResourceType, number>> = {
+    "TownCenter": {wood: 50, food: 0, gold: 0}
+};
+
+export type UnitCost = Record<ResourceType, number>;
+export type UnitType = "Villager" | "Infantry" | "Archer";
 
 export class Building extends Entity {
     // approach positions around building
@@ -109,7 +115,7 @@ export class Building extends Entity {
         return this.cost ? this.cost : {wood: 0, food: 0, gold: 0};
     }
 
-    // check if building is under construction
+    // check if building is under construction, update state if finished
     isUnderConstruction(): boolean {
         if (this.buildAmount < this.MAX_BUILD_AMOUNT[this.name]) {
             return true;
@@ -126,6 +132,11 @@ export class Building extends Entity {
     build(buildAmount: number): void {
         if (buildAmount > 0) {
             this.buildAmount += buildAmount;
+            
+            // check if finished and update state
+            if (!this.isUnderConstruction()) {
+                this.state = "completed";
+            }
         }
         this.updateApperance(this.buildAmount);
     }

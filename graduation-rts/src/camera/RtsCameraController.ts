@@ -62,8 +62,6 @@ export class RtsCameraController {
         const zoomAmount = zoomDelta * this.zoomSpeed;
         const newZoom = this.camera.camera.orthoHeight - zoomAmount;
         this.camera.camera.orthoHeight = Math.max(this.minZoom, Math.min(this.maxZoom, newZoom));
-
-        console.log("orthoHeight: ", this.camera.camera.orthoHeight);
     }
 
     update(dt: number) {

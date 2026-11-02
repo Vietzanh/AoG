@@ -29,7 +29,7 @@ export class Villager extends Entity {
     private readonly GATHER_AMOUNT = 10;
     private readonly GATHER_INTERVAL = 1;
 
-    private targetBuilding: TownCenter | null = null;
+    private targetBuilding: Building | null = null;
     private deliveryCompleted = false;
 
     private buildTimer = 0;
@@ -239,12 +239,11 @@ export class Villager extends Entity {
     build(building: Building) {
         if (building.isUnderConstruction()) {
             building.build(this.BUILD_SPEED);
-            console.log(this.targetBuilding?.getState());
         } else {
             this.state = "idle";
-            building.setState("completed");
             this.targetBuilding = null;
         }
+        console.log(building.getState());
         this.buildTimer = 0;
     }
 

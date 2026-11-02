@@ -16,6 +16,7 @@ import {RtsCameraController} from "../camera/RtsCameraController.ts";
 import {ResourceNode, type ResourceType} from "../entities/ResourceNode.ts";
 import {TownCenter} from "../entities/TownCenter.ts";
 import { ResourceHUD } from "../ui/ResourceHUD.ts";
+import {BuildingHUD} from "../ui/BuildingHUD.ts";
 import { Building } from "../entities/Building.ts";
 import { BuildingPlacementController } from "../build/BuildingPlacementController.ts";
 
@@ -49,12 +50,15 @@ export class Game {
         gold: 0
     }
     private resourceHUD: ResourceHUD;
+    private buildingHUD: BuildingHUD;
     private resourceNodes: Set<ResourceNode> = new Set();
 
     private buildings: Set<Building> = new Set();
 
     // units lineup formation
     private readonly UNIT_SPACING = 2.5;
+
+    private selectedTownCenter: TownCenter | null = null;
 
     constructor(app: AppBase, mouse: Mouse, keyboard: Keyboard, canvas: HTMLCanvasElement) {
         this.app = app;
@@ -119,6 +123,9 @@ export class Game {
         // initialize resource HUD
         this.resourceHUD = new ResourceHUD();
         this.resourceHUD.renderResources(this.playerResources);
+        // initialize building HUD
+        this.buildingHUD = new BuildingHUD(() => this.handleVilalgerProduction());  // pass callback as parameter, not calling function immediately
+        this.buildingHUD.show();
 
         // sync game's update funtion with app's update function
         this.app.on("update", (dt) => {
@@ -157,7 +164,7 @@ export class Game {
                     const position = this.raycastMousePosition();
                     if (position) {
                         this.buildingPlacementController.updatePreviewPosition(position);
-                        this.buildingPlacementController.updatePreviewAppearane(this.resourceNodes, this.buildings);
+                        this.buildingPlacementController.updatePreviewApperane(this.resourceNodes, this.buildings, this.playerResources);
                         this.app.root.addChild(building);
                     }
                 }
@@ -322,7 +329,8 @@ export class Game {
             const dy = this.dragCurrent.y - this.dragStart.y;
             const distance = Math.sqrt(dx*dx + dy*dy);
 
-            if (distance > this.DRAG_THRESHOLD) {
+            // check condition to set dragging, while no building is being previewed
+            if (distance > this.DRAG_THRESHOLD && !this.buildingPlacementController.getPreview()) {
                 this.isDragging = true;
             }
         }
@@ -352,7 +360,10 @@ export class Game {
                 if (result) {
                     this.leftMouseClicked(result.entity);
                 } else {
-                    this.unselectVillagers();
+                    // if placing building outside map, keep selected villagers
+                    if (!this.buildingPlacementController.getPreview()) {
+                        this.unselectVillagers();
+                    }
                 }
             }
 
@@ -363,9 +374,16 @@ export class Game {
         }
         // right mouse
         else if (event.button === 2) {
-            const result = this.raycast(event);
-            if (result) {
-                this.rightMouseClicked(result.entity, result.point);
+            // remove building preview whether recast hits entity or not
+            if (this.buildingPlacementController.getPreview()) {
+                this.buildingPlacementController.removePreview();
+            } 
+            // call right mouse clicking logic if not removing preview
+            else {
+                const result = this.raycast(event);
+                if (result) {
+                    this.rightMouseClicked(result.entity, result.point);
+                }
             }
         }
     }
@@ -448,7 +466,11 @@ export class Game {
         );
 
         const rigidbody = this.app.systems.rigidbody;
-        const result = rigidbody?.raycastFirst(from, to);
+        const result = rigidbody?.raycastFirst(from, to, {
+            filterCallback: (entity: Entity) => {
+                return (entity.name === "ground" && !entity.tags.has("ignore-raycast"));
+            }
+        });
 
         if (!result) {
             return null;
@@ -470,7 +492,9 @@ export class Game {
     // check for available space and resource to place building, then create building and decrease player resources
     private placeBuilding(): Building | null {
         const building = this.buildingPlacementController.confirmPlacement(this.resourceNodes, this.buildings, this.playerResources);
-        if (building) {
+
+        // building condition while at least 1 villager is being selected
+        if (building && this.selectedVillagers.size > 0) {
             this.playerResources.wood -= building.getCost().wood;
             this.playerResources.food -= building.getCost().food;
             this.playerResources.gold -= building.getCost().gold;
@@ -486,8 +510,16 @@ export class Game {
 
     // handle events hen left mouse clicked
     private leftMouseClicked(entity: Entity): void {
+        // if a building preview is existing, try place building
+        if (this.buildingPlacementController.getPreview()) {
+            const plannedBuilding = this.placeBuilding();
+            for (const villager of this.selectedVillagers) {
+                villager.moveToBuilding(plannedBuilding);
+            }
+            this.resourceHUD.renderResources(this.playerResources);
+        }
         // if entity is Villager => unselect all villagers, then select the new villager
-        if (entity instanceof Villager) {
+        else if (entity instanceof Villager) {
             // hold CTRL and click to select multiple units
             if (!this.keyboard.isPressed(KEY_CONTROL)) {
                 this.unselectVillagers();
@@ -495,29 +527,13 @@ export class Game {
             entity.setSelected(true);
             this.selectedVillagers.add(entity);
         } else {
-            // if a building preview is existing, try place building
-            if (this.buildingPlacementController.getPreview()) {
-                const plannedBuilding = this.placeBuilding();
-                for (const villager of this.selectedVillagers) {
-                    villager.moveToBuilding(plannedBuilding);
-                }
-                this.resourceHUD.renderResources(this.playerResources);
-            }
             // if no building preview is existing, unselect all villagers
-            else {
-                this.unselectVillagers();
-            }
+            this.unselectVillagers();
         }
     }
 
     // handle events when right mouse clicked
     private rightMouseClicked(hitEntity: Entity, hitPosition: Vec3): void {
-        // if a building preview is existing, remove it
-        if (this.buildingPlacementController.getPreview()) {
-            this.buildingPlacementController.removePreview();
-            return;
-        }
-
         // if right click on ground, villager move to town center
         if (hitEntity === this.ground) {
             // lineup selected villagers
@@ -566,6 +582,24 @@ export class Game {
         }
     }
 
+    // handle clicking villager production button
+    private handleVilalgerProduction(): void {
+        const townCenter = this.selectedTownCenter;
+
+        // check if a TC is selected
+        if (!townCenter) {
+            return;
+        }
+
+        // check for condition to start production
+        if (!townCenter.canStartProduction(this.playerResources)) {
+            return;
+        }
+
+        townCenter.startProduction(this.playerResources);
+        this.resourceHUD.renderResources(this.playerResources);
+    }
+
     // update function every frame
     private update(dt: number): void {
         // variable used for detecting if need to change resource HUD
@@ -608,7 +642,7 @@ export class Game {
             if (position) {
                 this.buildingPlacementController.updatePreviewPosition(position);
             }
-            this.buildingPlacementController.updatePreviewAppearane(this.resourceNodes, this.buildings);
+            this.buildingPlacementController.updatePreviewApperane(this.resourceNodes, this.buildings, this.playerResources);
         }
 
     }
