@@ -9,6 +9,7 @@ import type {UnitCost, UnitType} from "./Building";
 
 export class TownCenter extends Building {
     private spawnPositions: Vec3[] = [];
+    private rallyPoint: Vec3;
 
     private currentProduction: ProductionOrder | null = null;
 
@@ -43,9 +44,10 @@ export class TownCenter extends Building {
             gold: 0
         };
 
-        // create spawn positions and approach positions
+        // create spawn positions, approach positions and initial rally point
         this.createSpawnPositions();
         this.createApproachPositions();
+        this.rallyPoint = this.spawnPositions[0].clone();
     }
 
     // create villager spawn positions
@@ -66,13 +68,14 @@ export class TownCenter extends Building {
         }
     }
 
-    // get nearest spawn position
-    getSpawnPosition(villagerPosition: Vec3): Vec3 {
+    // get nearest spawn position to rally point
+    getSpawnPosition(): Vec3 {
         let nearest = this.approachPositions[0];
         let minDistance = Infinity;
+        const rallyPoint = this.rallyPoint.clone();
 
         for (const position of this.spawnPositions) {
-            const distance = position.clone().sub(villagerPosition).length();
+            const distance = position.clone().sub(rallyPoint).length();
 
             if (distance < minDistance) {
                 minDistance = distance;
@@ -83,10 +86,22 @@ export class TownCenter extends Building {
         return nearest;
     }
 
+    // get rally point
+    getRallyPoint(): Vec3 {
+        return this.rallyPoint.clone();
+    }
+
+    // set rally point
+    setRallyPoint(position: Vec3): void {
+        this.rallyPoint = position.clone();
+    }
+
+
     // check condition to start production of a unit
     canStartProduction(availableResources: Record<ResourceType, number>): boolean {
         // check if the building is completed and not currently producing a unit
         if (this.state !== "completed" || this.currentProduction !== null) {
+            console.log("Building is not completed or currently producing a unit");
             return false;
         }
 
@@ -101,6 +116,7 @@ export class TownCenter extends Building {
             || villagerCost.wood > availableResources.wood
             || villagerCost.gold > availableResources.gold
         ) {
+            console.log("Insufficient resources to start production");
             return false;
         }
         
@@ -116,7 +132,7 @@ export class TownCenter extends Building {
         this.currentProduction = {
             unitType: "Villager",
             elapsedTime: 0,
-            productionTime: 10
+            productionTime: 5
         };
 
         // decrease resouces based on the production cost
@@ -127,11 +143,21 @@ export class TownCenter extends Building {
         return true;
     }
 
-    // update production progress
-    updateProduction(dt: number): void {
-        if (this.currentProduction && this.currentProduction.elapsedTime < this.currentProduction.productionTime) {
-            this.currentProduction.elapsedTime += dt;
+    // update production progress and return ProductionOrder if production is completed
+    updateProduction(dt: number): ProductionOrder | null {
+        if (!this.currentProduction) {
+            return null;
         }
+
+        this.currentProduction.elapsedTime += dt;
+
+        if (this.currentProduction.elapsedTime >= this.currentProduction.productionTime) {
+            const completedProduction = this.currentProduction;
+            this.currentProduction = null;
+            return completedProduction;
+        }
+
+        return null;
     }
 
 }

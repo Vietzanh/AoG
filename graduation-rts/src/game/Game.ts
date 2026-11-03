@@ -46,7 +46,7 @@ export class Game {
 
     private playerResources: Record<ResourceType, number> = {
         wood: 150,
-        food: 0,
+        food: 100,
         gold: 0
     }
     private resourceHUD: ResourceHUD;
@@ -124,8 +124,7 @@ export class Game {
         this.resourceHUD = new ResourceHUD();
         this.resourceHUD.renderResources(this.playerResources);
         // initialize building HUD
-        this.buildingHUD = new BuildingHUD(() => this.handleVilalgerProduction());  // pass callback as parameter, not calling function immediately
-        this.buildingHUD.show();
+        this.buildingHUD = new BuildingHUD(() => this.handleVillagerProduction());  // pass callback as parameter, not calling function immediately
 
         // sync game's update funtion with app's update function
         this.app.on("update", (dt) => {
@@ -309,6 +308,11 @@ export class Game {
             return;
         }
 
+        // if clicking on building HUD, do nothing
+        if (this.buildingHUD.isMouseOver(event.x, event.y)) {
+            return;
+        }
+
         this.dragStart = new Vec2(event.x, event.y);
         this.dragCurrent = new Vec2(event.x, event.y);
         this.isDragging = false;
@@ -365,6 +369,7 @@ export class Game {
                         this.unselectVillagers();
                     }
                 }
+                
             }
 
             this.selectionRect.style.display = "none";
@@ -518,6 +523,11 @@ export class Game {
             }
             this.resourceHUD.renderResources(this.playerResources);
         }
+        // if entity is TC, select TC and show building HUD
+        else if (entity instanceof TownCenter) {
+            this.selectedTownCenter = entity;
+            this.buildingHUD.show();
+        }
         // if entity is Villager => unselect all villagers, then select the new villager
         else if (entity instanceof Villager) {
             // hold CTRL and click to select multiple units
@@ -527,13 +537,22 @@ export class Game {
             entity.setSelected(true);
             this.selectedVillagers.add(entity);
         } else {
-            // if no building preview is existing, unselect all villagers
+            // unselect all villagers
             this.unselectVillagers();
+            this.buildingHUD.hide();
+            this.selectedTownCenter = null;
         }
+        console.log(this.selectedTownCenter);
     }
 
     // handle events when right mouse clicked
     private rightMouseClicked(hitEntity: Entity, hitPosition: Vec3): void {
+        // set rally point if a TC is selected
+        if (this.selectedTownCenter) {
+            this.selectedTownCenter.setRallyPoint(hitPosition);
+            return;
+        }
+
         // if right click on ground, villager move to town center
         if (hitEntity === this.ground) {
             // lineup selected villagers
@@ -583,7 +602,7 @@ export class Game {
     }
 
     // handle clicking villager production button
-    private handleVilalgerProduction(): void {
+    private handleVillagerProduction(): void {
         const townCenter = this.selectedTownCenter;
 
         // check if a TC is selected
@@ -644,6 +663,26 @@ export class Game {
             }
             this.buildingPlacementController.updatePreviewApperane(this.resourceNodes, this.buildings, this.playerResources);
         }
+
+        // update production progress of all buildings
+        for (const building of this.buildings) {
+            if (!(building instanceof TownCenter)) {
+                continue;
+            }
+
+            const completedProduction = building.updateProduction(dt);
+            if (completedProduction) {
+                const newVillager = new Villager(building.getSpawnPosition());
+                this.villagers.push(newVillager);
+                this.app.root.addChild(newVillager);
+                
+                // villager move to rally point
+                newVillager.moveTo(building.getRallyPoint());
+            }
+        }
+
+
+
 
     }
 }

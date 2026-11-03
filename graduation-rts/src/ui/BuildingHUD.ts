@@ -61,4 +61,11 @@ export class BuildingHUD {
     hide(): void {
         this.container.style.display = "none";
     }
+
+    // check if mouse is over the building HUD
+    isMouseOver(mouseX: number, mouseY: number): boolean {
+        const element = document.elementFromPoint(mouseX, mouseY);
+
+        return element !== null && this.container.contains(element);
+    }
 }
