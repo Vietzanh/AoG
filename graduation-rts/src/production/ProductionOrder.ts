@@ -1,12 +1,7 @@
-import {
-    Entity,
-    Vec3
-} from "playcanvas";
-import type {BuildingState} from "../entities/Building";
-import type {ResourceType} from "../entities/ResourceNode";
+import type {UnitType} from "../entities/Building";
 
 export interface ProductionOrder {
-    unitType: string;
+    unitType: UnitType;
     elapsedTime: number;
     productionTime: number;
 }

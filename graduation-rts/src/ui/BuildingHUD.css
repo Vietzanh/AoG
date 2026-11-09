@@ -47,3 +47,58 @@
 .production-slot:hover {
     background: #c49a43;
 }
+
+/* block displaying villager production progress */
+.production-progress-slot {
+    position: relative;
+
+    width: 60px;
+    height: 60px;
+    box-sizing: border-box;
+
+    margin-top: 0 px;
+    margin-bottom: 8 px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    background: #263f4e;
+    border: 1px solid #6b9bb0;
+    border-radius: 4px;
+
+    color: white;
+    font-size: 18px;
+}
+
+/* unit label */
+.production-progress-label {
+    font-weight: bold;
+}
+
+/* background of progress bar */
+.production-progress-track {
+    position: absolute;
+
+    left: 5px;
+    right: 5px;
+    bottom: 5px;
+
+    height: 7px;
+
+    background: #15232b;
+    border-radius: 4px;
+
+    overflow: hidden;
+}
+
+/* fulfilled part of progress bar */
+.production-progress-fill {
+    width: 0%;
+    height: 100%;
+
+    background: #54d68b;
+    border-radius: 4px;
+
+    transition: width 100ms linear;
+}

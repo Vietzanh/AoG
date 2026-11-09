@@ -17,7 +17,7 @@ import {ResourceNode, type ResourceType} from "../entities/ResourceNode.ts";
 import {TownCenter} from "../entities/TownCenter.ts";
 import { ResourceHUD } from "../ui/ResourceHUD.ts";
 import {BuildingHUD} from "../ui/BuildingHUD.ts";
-import { Building } from "../entities/Building.ts";
+import { Building, type UnitType } from "../entities/Building.ts";
 import { BuildingPlacementController } from "../build/BuildingPlacementController.ts";
 
 export class Game {
@@ -124,7 +124,7 @@ export class Game {
         this.resourceHUD = new ResourceHUD();
         this.resourceHUD.renderResources(this.playerResources);
         // initialize building HUD
-        this.buildingHUD = new BuildingHUD(() => this.handleVillagerProduction());  // pass callback as parameter, not calling function immediately
+        this.buildingHUD = new BuildingHUD((unitType: UnitType) => this.handleVillagerProduction(unitType));  // pass callback as parameter, not calling function immediately
 
         // sync game's update funtion with app's update function
         this.app.on("update", (dt) => {
@@ -368,6 +368,8 @@ export class Game {
                     if (!this.buildingPlacementController.getPreview()) {
                         this.unselectVillagers();
                     }
+                    this.buildingHUD.hide();
+                    this.selectedTownCenter = null;
                 }
                 
             }
@@ -518,6 +520,11 @@ export class Game {
         // if a building preview is existing, try place building
         if (this.buildingPlacementController.getPreview()) {
             const plannedBuilding = this.placeBuilding();
+
+            if (!plannedBuilding) {
+                return;
+            }
+
             for (const villager of this.selectedVillagers) {
                 villager.moveToBuilding(plannedBuilding);
             }
@@ -525,24 +532,31 @@ export class Game {
         }
         // if entity is TC, select TC and show building HUD
         else if (entity instanceof TownCenter) {
-            this.selectedTownCenter = entity;
-            this.buildingHUD.show();
-        }
-        // if entity is Villager => unselect all villagers, then select the new villager
-        else if (entity instanceof Villager) {
-            // hold CTRL and click to select multiple units
-            if (!this.keyboard.isPressed(KEY_CONTROL)) {
-                this.unselectVillagers();
+            // if TC is already selected, do nothing
+            if (this.selectedTownCenter === entity) {
+                return;
             }
-            entity.setSelected(true);
-            this.selectedVillagers.add(entity);
-        } else {
-            // unselect all villagers
+            this.buildingHUD.show();
+            this.selectedTownCenter = entity;
             this.unselectVillagers();
+        }
+        else {
             this.buildingHUD.hide();
             this.selectedTownCenter = null;
+
+            // if entity is Villager => unselect all villagers, then select the new villager
+            if (entity instanceof Villager) {
+                // hold CTRL and click to select multiple units
+                if (!this.keyboard.isPressed(KEY_CONTROL)) {
+                    this.unselectVillagers();
+                }
+                entity.setSelected(true);
+                this.selectedVillagers.add(entity);
+            } else {
+                // unselect all villagers
+                this.unselectVillagers();
+            }
         }
-        console.log(this.selectedTownCenter);
     }
 
     // handle events when right mouse clicked
@@ -602,7 +616,7 @@ export class Game {
     }
 
     // handle clicking villager production button
-    private handleVillagerProduction(): void {
+    private handleVillagerProduction(unitType: UnitType): void {
         const townCenter = this.selectedTownCenter;
 
         // check if a TC is selected
@@ -610,13 +624,19 @@ export class Game {
             return;
         }
 
-        // check for condition to start production
-        if (!townCenter.canStartProduction(this.playerResources)) {
-            return;
-        }
+        if (townCenter.startProduction(this.playerResources)) {
+            // decrease resources should be in Game.ts, not in startProduction
+            const unitCost = townCenter.getProductionCost(unitType);
+            if (!unitCost) {
+                return;
+            }
+            this.playerResources.wood -= unitCost.wood;
+            this.playerResources.food -= unitCost.food;
+            this.playerResources.gold -= unitCost.gold;
 
-        townCenter.startProduction(this.playerResources);
-        this.resourceHUD.renderResources(this.playerResources);
+            // decrease resources should be in Game.ts, not in startProduction
+            this.resourceHUD.renderResources(this.playerResources);
+        }
     }
 
     // update function every frame
@@ -671,13 +691,22 @@ export class Game {
             }
 
             const completedProduction = building.updateProduction(dt);
+
+            // display production progress
+            const progress = building.getProductionProgress();
+            this.buildingHUD.updateProductionProgress(progress);
+
+            // craete unit when production is done
             if (completedProduction) {
+                // create new villager
                 const newVillager = new Villager(building.getSpawnPosition());
                 this.villagers.push(newVillager);
                 this.app.root.addChild(newVillager);
-                
                 // villager move to rally point
                 newVillager.moveTo(building.getRallyPoint());
+
+                // hide production progress
+                this.buildingHUD.hideProductionProgress();
             }
         }
 

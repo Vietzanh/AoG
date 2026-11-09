@@ -70,7 +70,7 @@ export class TownCenter extends Building {
 
     // get nearest spawn position to rally point
     getSpawnPosition(): Vec3 {
-        let nearest = this.approachPositions[0];
+        let nearest = this.spawnPositions[0].clone();
         let minDistance = Infinity;
         const rallyPoint = this.rallyPoint.clone();
 
@@ -83,7 +83,7 @@ export class TownCenter extends Building {
             }
         }
 
-        return nearest;
+        return nearest.clone();
     }
 
     // get rally point
@@ -125,7 +125,7 @@ export class TownCenter extends Building {
 
     // start a production, returns true if production started successfully and decrease resouces
     startProduction(resources: Record<ResourceType, number>): boolean {
-        if (!this.canStartProduction) {
+        if (!this.canStartProduction(resources)) {
             return false;
         }
 
@@ -135,12 +135,13 @@ export class TownCenter extends Building {
             productionTime: 5
         };
 
-        // decrease resouces based on the production cost
-        resources.food -= this.productionCosts.Villager!.food;
-        resources.wood -= this.productionCosts.Villager!.wood;
-        resources.gold -= this.productionCosts.Villager!.gold;
-
         return true;
+    }
+
+    // get unit production cost
+    getProductionCost(unitType: UnitType): UnitCost | null {
+        const unitCost = this.productionCosts[unitType];
+        return {wood: unitCost?.wood ?? 0, food: unitCost?.food ?? 0, gold: unitCost?.gold ?? 0};
     }
 
     // update production progress and return ProductionOrder if production is completed
@@ -149,7 +150,7 @@ export class TownCenter extends Building {
             return null;
         }
 
-        this.currentProduction.elapsedTime += dt;
+        this.currentProduction.elapsedTime = Math.min(this.currentProduction.elapsedTime+dt, this.currentProduction.productionTime);
 
         if (this.currentProduction.elapsedTime >= this.currentProduction.productionTime) {
             const completedProduction = this.currentProduction;
@@ -158,6 +159,15 @@ export class TownCenter extends Building {
         }
 
         return null;
+    }
+
+    // get production progress
+    getProductionProgress(): number | null {
+        if (!this.currentProduction) {
+            return null;
+        }
+
+        return Math.min(1, this.currentProduction.elapsedTime / this.currentProduction.productionTime);
     }
 
 }
